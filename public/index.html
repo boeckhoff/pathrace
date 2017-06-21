@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body>
+<h1><time>00:00:00</time></h1>
+<h1>Highscore:</h1>
+<h1><time>00:00:00</time></h1>
+
+<style> 
+path {
+  fill: none;
+  stroke: #000;
+  stroke-width: 3px;
+}
+
+circle {
+  stroke: #fff;
+  stroke-width: 3px;
+}
+
+</style>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/4.1.2/firebase.js"></script>
+<script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyBg63ycGupU7t7TI8mmVhFYrQiYsTu_yPs",
+    authDomain: "pathrace-e1543.firebaseapp.com",
+    databaseURL: "https://pathrace-e1543.firebaseio.com",
+    projectId: "pathrace-e1543",
+    storageBucket: "pathrace-e1543.appspot.com",
+    messagingSenderId: "411332600186"
+  };
+  firebase.initializeApp(config);
+</script>
+<script>
+
+firebase.auth().signInAnonymously()
+
+var timerString = document.getElementsByTagName('h1')[0], centiseconds = 0, lock = 0, mouseS = 0, t, highscore = getHighscore();
+var highscoreString = document.getElementsByTagName('h1')[2]
+updateHighscoreString()
+
+function updateHighscoreString() {
+	highscoreString.textContent = (highscore/100 > 9 ? highscore/100 : "0" + highscore/100) + ":" + (highscore%100);
+}
+
+
+function add() {
+    centiseconds++;
+    
+    timerString.textContent = (centiseconds/100 > 9 ? centiseconds/100 : "0" + centiseconds/100) + ":" + (centiseconds%100);
+	timer();
+}
+
+async function timer() {
+	if(locked==0) {
+		t = setTimeout(add, 10);
+	}
+}
+
+async function stop() { clearTimeout(t);
+}
+
+async function clear() {
+    timerString.textContent = "00:00";
+    centiseconds = 0;
+}
+
+var points = [
+  [480, 200],
+  [580, 400],
+  [680, 100],
+  [780, 300],
+  [180, 300],
+  [280, 100],
+  [380, 400]
+];
+
+function mouse() {
+	mouseS = 1;
+	circle.attr("fill", "green")	
+	timer()
+}
+
+function mouseOut() {
+	mouseS = 0;
+	circle.attr("fill", "red")	
+	stop()
+}
+
+var svg = d3.select("body").append("svg")
+    .attr("width", 960)
+    .attr("height", 500);
+
+var path = svg.append("path")
+    .data([points])
+    .attr("d", d3.svg.line()
+		.tension(0) // Catmull–Rom
+		.interpolate("cardinal-closed"));
+
+svg.selectAll(".point")
+    .data(points)
+  .enter().append("circle")
+    .attr("r", 4)
+    .attr("transform", function(d) { return "translate(" + d + ")"; });
+
+var circle = svg.append("circle")
+    .attr("r", 13)
+    .attr("transform", "translate(" + points[0] + ")")
+	.on("mouseover", mouse)
+	.on("mouseout", mouseOut)
+
+transition();
+
+
+function setHighscore() {
+    var ref = firebase.database().ref("highscore")
+	ref.set(centiseconds)
+}
+
+
+function getHighscore() {
+	var ref = firebase.database().ref("highscore")
+	ref.on("value", function(child) {
+			highscore = child.val()
+			updateHighscoreString()
+		})
+}
+
+function endTransition() {
+	stop();
+	locked = 1;
+	console.log(centiseconds)
+	console.log(highscore)
+	if(centiseconds > highscore) {
+		setHighscore()
+		highscore = centiseconds
+	}
+	setTimeout(transition, 3000);
+}
+
+function transition() {
+	locked = 0;
+	clear()
+	if(mouseS == 1) {
+		timer()
+	}
+  circle.transition()
+      .duration(10000)
+      .attrTween("transform", translateAlong(path.node()))
+	  .ease("linear")
+      .each("end", endTransition);
+}
+
+// Returns an attrTween for translating along the specified path element.
+function translateAlong(path) {
+  var l = path.getTotalLength();
+  return function(d, i, a) {
+    return function(t) {
+      var p = path.getPointAtLength(t * l);
+      return "translate(" + p.x + "," + p.y + ")";
+    };
+  };
+}
+
+</script>
